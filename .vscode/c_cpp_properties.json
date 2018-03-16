@@ -31,7 +31,9 @@
                 "${workspaceRoot}",
                 "${workspaceRoot}/include",
                 "/usr/include/c++/7.3.0",
-                "/usr/include/c++/7.3.0/x86_64-pc-linux-gnu"
+                "/usr/include/c++/7.3.0/x86_64-pc-linux-gnu",
+                "/usr/include/linux",
+                "${workspaceRoot}/lib/bytecode-description/include"
             ],
             "defines": [],
             "intelliSenseMode": "clang-x64",
@@ -39,7 +41,8 @@
                 "path": [
                     "/usr/include",
                     "/usr/local/include",
-                    "${workspaceRoot}"
+                    "${workspaceRoot}",
+                    "${workspaceRoot}/include"
                 ],
                 "limitSymbolsToIncludedHeaders": true,
                 "databaseFilename": ""
