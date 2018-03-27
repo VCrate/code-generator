@@ -8,9 +8,8 @@ int main() {
 
     Context ctx;
 
-    Signature func_signature;
     // ui32, ui8... -> void*
-    func_signature.set_return_type(Type::ptr);
+    Signature func_signature(Type::ptr);
     func_signature.add_arg(Type::uinteger32);
     func_signature.enable_var_args(Type::uinteger32);
 
@@ -25,15 +24,74 @@ int main() {
             ui32 res = print("allocated")
             return ret
     */
+    /*      Expected
+     ******************
+     * %A is the 'size' argument
+     * variables arguments are on the stack, then the number of argument 
+     * like ...|10|20|30|40|50| 5|
+     * return value in %A
+     ******************
+     *  NEW %A, %A
+     *  MOV %B, 0
+     *  MOV %C, [%SP - 4] // args count
+     *  CMP %B, %C
+     *  JMPGE for_end
+     * for_begin:
+     *  MOV %D, %A
+     *  ADD %D, %C
+     *  LEA %E, [%SP - 4]
+     *  SUB %E, %B
+     *  ADD %E, %C
+     *  MOV [%D], [%E]
+     *  INC %B
+     *  JMP for_begin
+     * for_end:
+     *  PUSH %A
+     *  MOV %A, [jmp_table_to_data_allocated_str]
+     *  SYM %B, [jmp_table_to_data_print_str]
+     *  CALL %B //ret in %A
+     *  POP %A
+     *  ret
+    */
+    /*      Minimal Expected
+     ******************
+     * stack : size, varaible_args, args count
+     * return value in %A
+     ******************
+     *  LEA %B, %SP
+     *  SUB %B, [%SP - 4]
+     *  SUB %B, 4
+     *  NEW %A, %B
+     *  MOV %C, 0
+     *  MOV %D, [%SP - 4] // args count
+     *  CMP %C, %D
+     *  JMPGE for_end
+     * for_begin:
+     *  MOV %E, %A
+     *  ADD %E, %D
+     *  LEA %F, [%SP - 4]
+     *  SUB %F, %C
+     *  ADD %F, %D
+     *  MOV [%E], [%F]
+     *  INC %D
+     *  JMP for_begin
+     * for_end:
+     *  PUSH %A
+     *  MOV %A, [jmp_table_to_data_allocated_str]
+     *  SYM %G, [jmp_table_to_data_print_str]
+     *  CALL %G //ret in %A
+     *  POP %A
+     *  ret
+    */
 
-    Locale param0 = func.get_param(0);
-    Locale ret = func.create_locale(Type::ptr);
-    
+    Value param0 = func.get_param(0);
+    Value ret = func.create_value(Type::void_ptr);
+
     func.allocate(func, param0, ret);
 
-    Locale args_count = func.args_count();
-    Locale counter = func.create_locale(Type::integer32);
-    func.store(counter, func.create_constant(Type::integer32, 0));
+    Value args_count = func.args_count();
+    Value counter = func.create_value(Type::int32);
+    func.store(counter, func.create_constant(Type::int32, 0));
     
     Label for_end = func.create_label();
     Label for_begin = func.create_label();
@@ -41,15 +99,15 @@ int main() {
 
     func.if_greater_equals(for_end, counter, args_count);
 
-    Locale target_ptr = func.create_locale(Type::ptr);
+    Value target_ptr = func.create_value(Type::char_ptr);
     func.store(target, ret);
     func.add(target, counter);
     
-    Locale source_ptr = func.create_locale(Type::ptr);
+    Value source_ptr = func.create_value(Type::char_ptr);
     func.store(source, func.get_args_ptr_begin());
     func.add(source, counter);
 
-    Locale source = func.create_locale(Type::uinteger8);
+    Value source = func.create_value(Type::uint8);
     func.defer(source, source_ptr);
 
     func.store_deferred(target_ptr, source);
@@ -59,18 +117,21 @@ int main() {
 
     func.link(for_end);
 
-    Locale print_function = func.create_locale(Type::ptr);
-    auto symbol_constant_name = func.create_constant(Type::ptr, "print"); // hmmm...
+    Value print_function = func.create_value(Type::func_ptr);
+    auto symbol_constant_name = func.create_constant(Type::char_ptr, "print"); // hmmm...
     func.retrieve_symbol(print_function, symbol_constant_name);
     
     Arguments args {
-        func.create_constant(Type::ptr, "allocated");
+        func.create_constant(Type::char_ptr, "allocated");
     };
 
-    Locale res = func.create_locale(Type::integer32);
+    Value res = func.create_value(Type::int32);
     func.call(print_function, res, args); // func.call(print_function, args); if no return value
 
     func.retrn(ret);
+
+    ctx.compile();
+    ctx.dump(std::cout);
 
     return 0;
 }

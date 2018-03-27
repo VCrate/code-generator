@@ -2,7 +2,8 @@
 #                     SRC                    #
 ##############################################
 # All directories to build (inside src/)
-DIR := 
+DIR := code-generator/context code-generator/function code-generator/value
+DIR += code-generator/helper code-generator/instruction
 # Files to exclude
 EXCLUDED_FILE := 
 # Directories with src/ prefix
@@ -17,7 +18,7 @@ SRC := $(filter-out $(EXCLUDED_FILE),$(foreach d,$(SRC_DIR),$(wildcard $(d)/*.cp
 MAIN_DIR := src/
 # Main file 
 # Pick one : main.cpp
-MAIN := main.cpp
+MAIN := simple_main.cpp
 # Main path
 MAIN_PATH := $(MAIN_DIR)/$(MAIN)
 # Main .o
