@@ -5,6 +5,8 @@
 #include <vcrate/code-generator/function/Function.hpp>
 #include <vcrate/code-generator/helper/Dumper.hpp>
 
+#include <vcrate/vcx/Executable.hpp>
+
 int main() {
     using namespace vcrate;
     using namespace vcrate::code_gen;

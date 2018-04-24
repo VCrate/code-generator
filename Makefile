@@ -1,23 +1,25 @@
 # Structure of the project: 
 #
-# 	/
-#   	build/  
-#			shared/
-#				project-name.so
-#				src/
-#					object files...
-#			static/
-#				project-name.a
-#				src/
-#					object files...
-#			executable/
-#				project-name
-#				src/
-#					object files
-#		src/
-#			sources files...
-#		inc/
-#			header files...
+# /
+#     build/  
+#         shared/
+#             libproject-name.so
+#             src/
+#                 object files...
+#         static/
+#             libproject-name.a
+#             src/
+#                 object files...
+#         executable/
+#             project-name
+#             src/
+#                 object files
+#     src/
+#         sources files...
+#     inc/
+#         header files...
+
+# Note: inc and src can be the same folder
 
 #####
 ##### FOLDER SETTINGS
@@ -36,13 +38,17 @@ BUILD_EXE_FOLDER := $(BUILD_FOLDER)/executable
 ##### GENERAL SETTINGS
 #####
 
-PROJECT_NAME := code_generator
+PROJECT_NAME := code_gen
 CXX := g++
+SXX := ar
 
 # Targets
 TARGET_SHARED := $(BUILD_SHARED_FOLDER)/lib$(PROJECT_NAME).so
 TARGET_STATIC := $(BUILD_STATIC_FOLDER)/lib$(PROJECT_NAME).a
 TARGET_EXE := $(BUILD_EXE_FOLDER)/$(PROJECT_NAME)
+
+# Target to build when `make` or `make all` is typed
+TARGET_ALL := $(TARGET_EXE) $(TARGET_SHARED) $(TARGET_STATIC)
 
 #####
 ##### FILES SETTINGS
@@ -76,9 +82,11 @@ SRC_MAIN := simple_main.cpp
 #####
 
 FLAGS := -std=c++17 -g3 -Wall -Wextra -Wno-pmf-conversions -O2
+STATIC_LINK_FLAG := rcs
+
 # Include path
 # Must be use with -I
-INC_FLAG := -I $(INC_FOLDER)
+INC_FLAG := -I $(INC_FOLDER) -I lib/bytecode-description/include
 
 #####
 ##### LIBRARY
@@ -86,10 +94,19 @@ INC_FLAG := -I $(INC_FOLDER)
 
 # Path to libaries if not in $PATH, for example (relative to the project folder): lib/
 # Must be use with -L
-LIBS_PATH :=
+LIBS_PATH := -L lib/bytecode-description/build/static 
 
 # For example: -lsfml-graphics
-LIBS :=
+LIBS := -lbytecode_desc
+
+# Library that require to be build
+LIB_TO_BUILD := lib/bytecode-description/build/static/libbytecode_desc.a
+
+# Create rules to build the libraries
+
+lib/bytecode-description/build/static/libbytecode_desc.a:
+	@$(call _special,BUILDING STATIC LIBRARY ($@)...)
+	@cd lib/bytecode-description/ && make | sed "s/^/\t/"
 
 ###############################################
 #                   PRIVATE                   #
@@ -125,15 +142,14 @@ _comma = ,
 # join <between> <list>
 _join = $(subst $(_space),$(1),$(2))
 
-# err <message>
-err = $(shell echo -e "$(_COLOR_RED)$(1)$(_RESET)")
-
 # _header <message>
 _header = echo -e "$(_COLOR_CYAN)$(_BOLD)>>> $(1)$(_RESET)"
 # _sub-header <message>
 _sub-header = echo -e "$(_COLOR_GREEN)>>> $(1)$(_RESET)"
 # _build-msg <target> <from>
 _build-msg = echo -e "$(_COLOR_WHITE):: Building $(_BOLD)$(1)$(_RESET)$(_COLOR_WHITE) from $(_BOLD)$(2)$(_RESET)"
+# _special <message>
+_special = echo -e "$(_COLOR_MAGENTA)$(_BOLD)\# $(1)$(_RESET)"
 
 # not <value>
 # return an empty string if value is not
@@ -161,7 +177,7 @@ endef
 ##### SOURCES
 #####
 
-_SRC_MAINS := $(addprefix src/,$(SRC_MAINS))
+_SRC_MAINS := $(addprefix $(SRC_FOLDER)/,$(SRC_MAINS))
 # All sources files not main
 _SRC_FILES := $(filter-out $(_SRC_MAINS),$(shell find $(SRC_FOLDER) -name '*$(EXT_SRC_FILE)'))
 
@@ -189,23 +205,30 @@ _OBJ_SRC_SHARED := $(_SRC_FILES:%$(EXT_SRC_FILE)=$(BUILD_SHARED_FOLDER)/%.o)
 
 _OBJ_SRC_STATIC := $(_SRC_FILES:%$(EXT_SRC_FILE)=$(BUILD_STATIC_FOLDER)/%.o)
 
-#####
-##### VERIFICATION
-##### 
-
-$(call _is-empty-er,$(call not,$(filter-out $(SRC_MAINS),$(SRC_MAIN))),$(SRC_MAIN) is not in the main's list)
-$(call _exists-er,$(SRC_FOLDER)/$(SRC_MAIN),$(SRC_FOLDER)/$(SRC_MAIN) doesn't exists)
+_LIB_PATH_LD := $(call _join,:,$(strip $(filter-out -L,$(LIBS_PATH))))
+export LD_LIBRARY_PATH += $(_LIB_PATH_LD)
 
 #####
 ##### RULES
 #####
 
-.PHONY: all clean executable shared static
+.PHONY: all executable shared static 
+.PHONY: clean clean-executable clean-shared clean-static
+.PHONY: re re-executable re-shared re-static
+.PHONY: re-run run
 
-all: 
+.DEFAULT_GOAL := all
+
+all:
+ifneq ($(findstring $(TARGET_EXE),$(TARGET_ALL)),)
 	@make executable
+endif
+ifneq ($(findstring $(TARGET_SHARED),$(TARGET_ALL)),)
 	@make shared
+endif
+ifneq ($(findstring $(TARGET_STATIC),$(TARGET_ALL)),)
 	@make static
+endif
 
 executable: 
 	@$(call _header,BUILDING EXECUTABLE...)
@@ -250,9 +273,9 @@ re-static:
 run:
 	@make executable
 	@echo
-	@$(call _sub-header,EXECUTING $(TARGET_EXE)...)
+	@$(call _special,EXECUTING $(TARGET_EXE)...)
 	@$(TARGET_EXE)
-	@$(call _sub-header,PROGRAM HALT WITH CODE $$?)
+	@$(call _special,PROGRAM HALT WITH CODE $$?)
 
 re-run:
 	@make re-executable
@@ -264,40 +287,40 @@ $(_BUILD_DIR):
 ###
 
 
-$(TARGET_STATIC): $(_BUILD_DIR) $(_OBJ_SRC_STATIC)
+$(TARGET_STATIC): $(_BUILD_DIR) $(LIB_TO_BUILD) $(_OBJ_SRC_STATIC)
 	@$(call _sub-header,Archiving...)
-	@ar rcs $(TARGET_STATIC) $(_OBJ_SRC_STATIC)
+	@$(SXX) $(STATIC_LINK_FLAG) $(TARGET_STATIC) $(_OBJ_SRC_STATIC)
 	@$(call _header,Static library done ($(TARGET_STATIC)))
 
 $(BUILD_STATIC_FOLDER)/$(SRC_FOLDER)/%.o: $(SRC_FOLDER)/%$(EXT_SRC_FILE) $(INC_FOLDER)/$(call header-of,%$(EXT_SRC_FILE))
 	@$(call _build-msg,$(notdir $@),$(call _join,$(_comma)$(_space),$(strip $(notdir $< $(wildcard $(word 2,$^))))))
-	@g++ -c $(INC_FLAG) $(FLAGS) -o "$@" "$<"
+	@$(CXX) -c $(INC_FLAG) $(FLAGS) -o "$@" "$<"
 
 
 ###
 
 
-$(TARGET_SHARED): $(_BUILD_DIR) $(_OBJ_SRC_SHARED)
+$(TARGET_SHARED): $(_BUILD_DIR) $(LIB_TO_BUILD) $(_OBJ_SRC_SHARED)
 	@$(call _sub-header,Shared library creation...)
-	@g++ $(INC_FLAG) $(FLAGS) -shared -o $(TARGET_SHARED) $(_OBJ_SRC_SHARED) $(LIBS_PATH) $(LIBS)
+	@$(CXX) $(INC_FLAG) $(FLAGS) -shared -o $(TARGET_SHARED) $(_OBJ_SRC_SHARED) $(LIBS_PATH) $(LIBS)
 	@$(call _header,Shared library done ($(TARGET_SHARED)))
 
 $(BUILD_SHARED_FOLDER)/$(SRC_FOLDER)/%.o: $(SRC_FOLDER)/%$(EXT_SRC_FILE) $(INC_FOLDER)/$(call header-of,%$(EXT_SRC_FILE))
 	@$(call _build-msg,$(notdir $@),$(call _join,$(_comma)$(_space),$(strip $(notdir $< $(wildcard $(word 2,$^))))))
-	@g++ -c $(INC_FLAG) $(FLAGS) $(SHARED_FLAGS) -o "$@" "$<"
+	@$(CXX) -c $(INC_FLAG) $(FLAGS) $(SHARED_FLAGS) -o "$@" "$<"
 
 
 ###
 
 
-$(TARGET_EXE): $(_BUILD_DIR) $(_OBJ_SRC_EXE)
+$(TARGET_EXE): $(_BUILD_DIR) $(LIB_TO_BUILD) $(_OBJ_SRC_EXE)
 	@$(call _sub-header,Linking...)
-	@g++ $(INC_FLAG) $(FLAGS) $(_OBJ_SRC_EXE) -o "$@" $(LIBS_PATH) $(LIBS)
+	@$(CXX) $(INC_FLAG) $(FLAGS) $(_OBJ_SRC_EXE) -o "$@" $(LIBS_PATH) $(LIBS)
 	@$(call _header,Executable done ($(TARGET_EXE)))
 
 $(BUILD_EXE_FOLDER)/$(SRC_FOLDER)/%.o: $(SRC_FOLDER)/%$(EXT_SRC_FILE) $(INC_FOLDER)/$(call header-of,%$(EXT_SRC_FILE))
 	@$(call _build-msg,$(notdir $@),$(call _join,$(_comma)$(_space),$(strip $(notdir $< $(wildcard $(word 2,$^))))))
-	@g++ -c $(INC_FLAG) $(FLAGS) -o "$@" "$<"
+	@$(CXX) -c $(INC_FLAG) $(FLAGS) -o "$@" "$<"
 
 
 # Just to avoid file without headers
