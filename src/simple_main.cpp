@@ -4,6 +4,7 @@
 #include <vcrate/code-generator/context/Context.hpp>
 #include <vcrate/code-generator/function/Function.hpp>
 #include <vcrate/code-generator/helper/Dumper.hpp>
+#include <vcrate/code-generator/instruction/Application.hpp>
 
 #include <vcrate/vcx/Executable.hpp>
 
@@ -26,5 +27,13 @@ int main() {
     ctx.dump(std::cout);
     //cc.dump(std::cout);
 
+    Application _ret = app_return(std::vector<Value>{ ret });
+
+    std::cout << operation::retrn.name << ", " << _ret.to_string() << '\n';
+
+    auto r = make_application(operation::retrn, { Access::Read });
+
+    Application __ret = r(std::vector<Value>{ ret });
+    std::cout << __ret.to_string() << '\n';
     return 0;
 }
