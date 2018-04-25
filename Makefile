@@ -68,14 +68,14 @@ EXT_INC_FILE = .hpp
 # EX: $(1:%$(EXT_SRC_FILE)=%$(EXT_INC_FILE)) 
 # will take the file "folder/sub_folder_file.cpp"
 # and transform it into "folder/sub_folder_file.hpp"
-header-of = $(1:%$(EXT_SRC_FILE)=vcrate/%$(EXT_INC_FILE))
+header-of = $(1:%$(EXT_SRC_FILE)=vcrate/code-generator/%$(EXT_INC_FILE))
 
 # Relative to $(SRC_FOLDER)
 SRC_EXCLUDE_FILE := 
 # All files that are not use for libraries, don't add src/
-SRC_MAINS := main.cpp simple_main.cpp
+SRC_MAINS := main.cpp
 # The main file to use (must be in $(SRC_MAINS))
-SRC_MAIN := simple_main.cpp
+SRC_MAIN := main.cpp
 
 #####
 ##### FLAGS

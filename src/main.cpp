@@ -1,137 +1,66 @@
 #include <iostream>
 
 #include <vcrate/Alias.hpp>
+#include <vcrate/code-generator/helper/Dumper.hpp>
+#include <vcrate/code-generator/core/Function.hpp>
+#include <vcrate/code-generator/core/Block.hpp>
+#include <vcrate/code-generator/value/Value.hpp>
+#include <vcrate/code-generator/value/Type.hpp>
+
+#include <vcrate/vcx/Executable.hpp>
 
 int main() {
     using namespace vcrate;
     using namespace vcrate::code_gen;
 
-    Context ctx;
 
-    // ui32, ui8... -> void*
-    Signature func_signature(Type::ptr);
-    func_signature.add_arg(Type::uinteger32);
-    func_signature.enable_var_args(Type::uinteger32);
-
-    auto func = ctx.create_function("alloc_filled", func_signature);
+    Function func;
+    // func.set_return_type(type::ptr);
+    // func.set_parameters(type::ui32);
     /*
-        alloc_filled :: ui32 size, ui8... args -> void*
-            void* ret = allocate(size)
-            ui32 counter = 0
-            while counter < args.size()
-                ret[counter] = args[counter]
-                ++counter
-            ui32 res = print("allocated")
-            return ret
-    */
-    /*      Expected
-     ******************
-     * %A is the 'size' argument
-     * variables arguments are on the stack, then the number of argument 
-     * like ...|10|20|30|40|50| 5|
-     * return value in %A
-     ******************
-     *  NEW %A, %A
-     *  MOV %B, 0
-     *  MOV %C, [%SP - 4] // args count
-     *  CMP %B, %C
-     *  JMPGE for_end
-     * for_begin:
-     *  MOV %D, %A
-     *  ADD %D, %C
-     *  LEA %E, [%SP - 4]
-     *  SUB %E, %B
-     *  ADD %E, %C
-     *  MOV [%D], [%E]
-     *  INC %B
-     *  JMP for_begin
-     * for_end:
-     *  PUSH %A
-     *  MOV %A, [jmp_table_to_data_allocated_str]
-     *  SYM %B, [jmp_table_to_data_print_str]
-     *  CALL %B //ret in %A
-     *  POP %A
-     *  ret
-    */
-    /*      Minimal Expected
-     ******************
-     * stack : size, varaible_args, args count
-     * return value in %A
-     ******************
-     *  LEA %B, %SP
-     *  SUB %B, [%SP - 4]
-     *  SUB %B, 4
-     *  NEW %A, %B
-     *  MOV %C, 0
-     *  MOV %D, [%SP - 4] // args count
-     *  CMP %C, %D
-     *  JMPGE for_end
-     * for_begin:
-     *  MOV %E, %A
-     *  ADD %E, %D
-     *  LEA %F, [%SP - 4]
-     *  SUB %F, %C
-     *  ADD %F, %D
-     *  MOV [%E], [%F]
-     *  INC %D
-     *  JMP for_begin
-     * for_end:
-     *  PUSH %A
-     *  MOV %A, [jmp_table_to_data_allocated_str]
-     *  SYM %G, [jmp_table_to_data_print_str]
-     *  CALL %G //ret in %A
-     *  POP %A
-     *  ret
-    */
+    Block& b = func.get_block();
+    Value p0 = func.get_parameter(0);
 
-    Value param0 = func.get_param(0);
-    Value ret = func.create_value(Type::void_ptr);
+    Block error;
+    Block allocate;
 
-    func.allocate(func, param0, ret);
-
-    Value args_count = func.args_count();
-    Value counter = func.create_value(Type::int32);
-    func.store(counter, func.create_constant(Type::int32, 0));
+    Value ex = error.create_value(type::i32);
+    error.insn_store(ex, 0);
+    error.end_with_throw(ex);
     
-    Label for_end = func.create_label();
-    Label for_begin = func.create_label();
-    func.link(for_begin);
+    Value allocated_block = allocate.insn_new(p0);
+    allocate.end_with_return(allocated_block);
 
-    func.if_greater_equals(for_end, counter, args_count);
+    Value constant_0 = b.create_value(type::i32);
+    b.insn_store(constant_0, 0);
+    Value inf_eq_0 = b.insn_inf_eq(p0, constant_0);
+    b.end_with_branch(inf_eq_0, 
+        allocate,
+        error);
+*/
 
-    Value target_ptr = func.create_value(Type::char_ptr);
-    func.store(target, ret);
-    func.add(target, counter);
-    
-    Value source_ptr = func.create_value(Type::char_ptr);
-    func.store(source, func.get_args_ptr_begin());
-    func.add(source, counter);
+    Value fake { 0, type::ptr };
 
-    Value source = func.create_value(Type::uint8);
-    func.defer(source, source_ptr);
+    Block& a = func.get_block();
+    Block b, c, d, e, f;
 
-    func.store_deferred(target_ptr, source);
+    a.name = "Block_A";
+    b.name = "Block_B";
+    c.name = "Block_C";
+    d.name = "Block_D";
+    e.name = "Block_E";
+    f.name = "Block_F";
 
-    func.increment(counter);
-    func.jump(for_begin);
+    //d.end_with_return(fake);
+    d.end_with_jump(b);
+    c.end_with_branch(fake, e, d);
+    b.end_with_jump(c);
+    e.end_with_jump(b);
 
-    func.link(for_end);
+    a.end_with_branch(fake, f, b);
+    f.end_with_halt(fake);
 
-    Value print_function = func.create_value(Type::func_ptr);
-    auto symbol_constant_name = func.create_constant(Type::char_ptr, "print"); // hmmm...
-    func.retrieve_symbol(print_function, symbol_constant_name);
-    
-    Arguments args {
-        func.create_constant(Type::char_ptr, "allocated");
-    };
-
-    Value res = func.create_value(Type::int32);
-    func.call(print_function, res, args); // func.call(print_function, args); if no return value
-
-    func.retrn(ret);
-
-    ctx.compile();
-    ctx.dump(std::cout);
+    std::cout << "Terminate ? " << func.check_terminate() << '\n';
 
     return 0;
 }

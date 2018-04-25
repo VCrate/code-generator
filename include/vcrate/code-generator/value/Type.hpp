@@ -7,30 +7,18 @@
 namespace vcrate { namespace code_gen {
 
 struct Type {
+    constexpr Type(ui32 size, std::string_view const& name) : size(size), name(name) {}
 
-    constexpr Type(const char* name, ui32 size) : name(name), size(size) {}
-    constexpr Type(Type const& type) : Type(type.name, type.size) {}
-    constexpr Type(Type&& type) : Type(std::move(type.name), std::move(type.size)) {}
-    constexpr Type& operator =(Type const& type) { name = type.name; size = type.size; return *this; } 
-    constexpr Type& operator =(Type&& type) { name = std::move(type.name); size = std::move(type.size); return *this; } 
-
-    const char* name;
     ui32 size;
-    
+    std::string_view name;
 };
 
 namespace type {
+    constexpr Type ptr (4, "ptr");
+    constexpr Type none (0, "void");
 
-constexpr Type void_ptr { "void*", 4 };
-constexpr Type func_ptr { "function*", 4 };
-constexpr Type char_ptr { "char*", 4 };
-
-constexpr Type int32 { "int32", 4 };
-constexpr Type uint32 { "uint32", 4 };
-
-constexpr Type int8 { "int8", 1 };
-constexpr Type uint8 { "uint8", 1 };
-
+    constexpr Type i32 (4, "i32");
+    constexpr Type boolean(1, "bool");
 }
 
 }}
