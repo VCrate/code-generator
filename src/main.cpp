@@ -3,6 +3,7 @@
 #include <vcrate/Alias.hpp>
 #include <vcrate/code-generator/helper/Dumper.hpp>
 #include <vcrate/code-generator/core/Function.hpp>
+#include <vcrate/code-generator/core/CompiledFunction.hpp>
 #include <vcrate/code-generator/core/Block.hpp>
 #include <vcrate/code-generator/value/Value.hpp>
 #include <vcrate/code-generator/value/Type.hpp>
@@ -61,6 +62,7 @@ int main() {
     f.end_with_halt(fake);
 
     std::cout << "Terminate ? " << func.check_terminate() << '\n';
+    CompiledFunction::from_function(func);
 
     return 0;
 }

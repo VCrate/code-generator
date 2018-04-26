@@ -75,19 +75,6 @@ bool Function::check_terminate() const {
         }
     }
 
-    std::cout << "Blocks: \n";
-    for(auto b : blocks) {
-        std::cout << b->name << '\n';
-        std::cout << "\tFROM: ";
-        for(auto p : previous_block[b])
-            std::cout << p->name << ", ";
-        std::cout << '\n';
-    }
-
-    std::cout << "Terminate: \n";
-    for(auto b : terminate_block) {
-        std::cout << b->name << '\n';
-    }
     return terminate_block.size() == blocks.size();
 }
 

@@ -26,6 +26,7 @@ public:
 private:
 
     friend class Function;
+    friend class CompiledFunction;
 
     enum class EndMethod {
         Return, Throw, Branch, Halt, Jump

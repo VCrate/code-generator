@@ -16,6 +16,8 @@ public:
 
 private:
 
+    friend class CompiledFunction;
+
     Block origin;
 
 };
