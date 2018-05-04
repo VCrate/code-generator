@@ -2,6 +2,9 @@
 
 #include <vcrate/Alias.hpp>
 #include <vcrate/code-generator/core/Block.hpp>
+#include <vcrate/vcx/Executable.hpp>
+
+#include <optional>
 
 namespace vcrate { namespace code_gen {
 
@@ -12,11 +15,9 @@ public:
 
     Value get_parameter(ui32 pos) const;
 
-    bool check_terminate() const;
+    std::optional<vcx::Executable> compile() const;
 
 private:
-
-    friend class CompiledFunction;
 
     Block origin;
 

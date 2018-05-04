@@ -1,9 +1,9 @@
 #include <iostream>
+#include <fstream>
 
 #include <vcrate/Alias.hpp>
 #include <vcrate/code-generator/helper/Dumper.hpp>
 #include <vcrate/code-generator/core/Function.hpp>
-#include <vcrate/code-generator/core/CompiledFunction.hpp>
 #include <vcrate/code-generator/core/Block.hpp>
 #include <vcrate/code-generator/value/Value.hpp>
 #include <vcrate/code-generator/value/Type.hpp>
@@ -52,8 +52,8 @@ int main() {
     e.name = "Block_E";
     f.name = "Block_F";
 
-    //d.end_with_return(fake);
-    d.end_with_jump(b);
+    d.end_with_return(fake);
+    //d.end_with_jump(e);
     c.end_with_branch(fake, e, d);
     b.end_with_jump(c);
     e.end_with_jump(b);
@@ -61,8 +61,16 @@ int main() {
     a.end_with_branch(fake, f, b);
     f.end_with_halt(fake);
 
-    std::cout << "Terminate ? " << func.check_terminate() << '\n';
-    CompiledFunction::from_function(func);
+    auto exe = func.compile();
+
+    if (!exe) {
+        std::cout << "Couldn't compile\n";
+        return 1;
+    }
+
+    exe->dump();
+    std::ofstream os("temp/test.vcx");
+    os << *exe;
 
     return 0;
 }
