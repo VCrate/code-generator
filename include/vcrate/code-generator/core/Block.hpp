@@ -35,6 +35,7 @@ public:
 
     void insn_load(Value const& to, std::vector<ui8> const& raw);
     void insn_copy(Value const& to, Value const& from);
+    void insn_dbg(Value const& value);
     void insn_compare(Value const& lhs, Value const& rhs);
     Value insn_new(Value const& size);
 
@@ -69,7 +70,8 @@ public:
     using EndValue = std::variant<EndValueJump, EndValueBranch, EndValueHalt, EndValueReturn, EndValueThrow>;
 
     enum class InsnOp {
-        Copy, Load
+        Copy, Load, 
+        Debug
     };
 
     struct insn_t {

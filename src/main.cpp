@@ -63,6 +63,7 @@ int main() {
     auto value = a.create_value(type::i32);
     a.insn_load(const_1, { 1, 0, 0, 0 });
     a.insn_copy(value, const_1);
+    a.insn_dbg(value);
     a.end_with_halt(value);
 
     /*

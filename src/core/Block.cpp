@@ -89,6 +89,14 @@ void Block::insn_copy(Value const& to, Value const& from) {
     });
 }
 
+void Block::insn_dbg(Value const& value) {
+    insn.push_back({
+        Block::InsnOp::Debug,
+        {value},
+        {}
+    });
+}
+
 Value Block::insn_new(Value const& size) {
     // TODO
     return create_value(type::ptr);

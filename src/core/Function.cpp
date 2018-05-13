@@ -30,6 +30,9 @@ ui32 predict_size(Block const& b) {
             case Block::InsnOp::Load:
                 size += (insn.raw.size() + 3) / 4;
                 break;
+            case Block::InsnOp::Debug:
+                size += 1;
+                break;
             default:
                 std::cout << "Unknown Instruction Operation\n";
                 break;
@@ -178,7 +181,7 @@ std::map<const Block*, ui32> compute_position(blocks_info_t const& info) {
     while(!blocks.empty()) {
         auto b = blocks.back();
         blocks.pop_back();
-        ui32 size = predict_size(*b)+1;
+        ui32 size = predict_size(*b);
         positions[b] = pos;
         pos += size;
     }
@@ -219,7 +222,7 @@ std::optional<vcx::Executable> Function::compile() const {
                 case Block::InsnOp::Copy:
                     push_insn(exe.code, make_mov(Operand::Register(insn.values[0].id), Operand::Register(insn.values[1].id)));
                     break;
-                case Block::InsnOp::Load:
+                case Block::InsnOp::Load: {
                     ui32 raw_size = (insn.raw.size() + 3) / 4;
                     auto get_raw = [&raw = insn.raw] (ui32 idx) {
                         return idx < raw.size() ? raw[idx] : 0;
@@ -229,30 +232,34 @@ std::optional<vcx::Executable> Function::compile() const {
                         push_insn(exe.code, make_mov(Operand::Register(insn.values[0].id), Operand::Value(value)));
                     }
                     break;
+                }
+                case Block::InsnOp::Debug:
+                    push_insn(exe.code, make_dbg(Operand::Register(insn.values[0].id)));
+                    break;
             }
         }
         std::visit(overloaded {
             [&] (Block::EndValueJump const& value) {
-                push_insn(exe.code, make_out(Operand::Value((ui32)block->name.back())));
+                //push_insn(exe.code, make_out(Operand::Value((ui32)block->name.back())));
                 push_insn(exe.code, make_jmp(Operand::Value(get_offset_to(value.next))));
             },
             [&] (Block::EndValueBranch const& value) {
-                push_insn(exe.code, make_out(Operand::Value((ui32)block->name.back())));
+                //push_insn(exe.code, make_out(Operand::Value((ui32)block->name.back())));
                 push_insn(exe.code, make_jmpe(Operand::Value(get_offset_to(value.then))));
                 push_insn(exe.code, make_jmp(Operand::Value(get_offset_to(value.otherwise))));
             },
             [&] (Block::EndValueHalt const& value) {
-                push_insn(exe.code, make_out(Operand::Value((ui32)block->name.back())));
+                //push_insn(exe.code, make_out(Operand::Value((ui32)block->name.back())));
                 push_insn(exe.code, make_mov(Operand::Register(0), Operand::Register(value.halt_code.id)));
                 push_insn(exe.code, make_hlt());
             },
-            [&] (Block::EndValueThrow const& value) {
-                push_insn(exe.code, make_out(Operand::Value((ui32)block->name.back())));
+            [&] (Block::EndValueThrow const& ) {
+                //push_insn(exe.code, make_out(Operand::Value((ui32)block->name.back())));
                 push_insn(exe.code, make_mov(Operand::Register(0), Operand::Value(1)));
                 push_insn(exe.code, make_hlt());
             },
-            [&] (Block::EndValueReturn const& value) {
-                push_insn(exe.code, make_out(Operand::Value((ui32)block->name.back())));
+            [&] (Block::EndValueReturn const& ) {
+                //push_insn(exe.code, make_out(Operand::Value((ui32)block->name.back())));
                 push_insn(exe.code, make_lve());
                 push_insn(exe.code, make_ret());
             }
