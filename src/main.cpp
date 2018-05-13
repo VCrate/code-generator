@@ -59,10 +59,10 @@ int main() {
     f.end_with_halt(fake);
 */
 
-    auto const_0 = a.create_value(type::i32);
+    auto const_1 = a.create_value(type::i32);
     auto value = a.create_value(type::i32);
-    a.insn_load(const_0, { 0, 0, 0, 0 });
-    a.insn_copy(value, const_0);
+    a.insn_load(const_1, { 1, 0, 0, 0 });
+    a.insn_copy(value, const_1);
     a.end_with_halt(value);
 
     /*

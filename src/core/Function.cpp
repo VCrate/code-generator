@@ -222,7 +222,7 @@ std::optional<vcx::Executable> Function::compile() const {
                 case Block::InsnOp::Load:
                     ui32 raw_size = (insn.raw.size() + 3) / 4;
                     auto get_raw = [&raw = insn.raw] (ui32 idx) {
-                        return raw.size() < idx ? raw[idx] : 0;
+                        return idx < raw.size() ? raw[idx] : 0;
                     };
                     for(ui32 i = 0; i < raw_size; ++i) {
                         ui32 value = get_raw(i) | get_raw(i+1)<<8 | get_raw(i+2)<<16 | get_raw(i+3)<<24;
