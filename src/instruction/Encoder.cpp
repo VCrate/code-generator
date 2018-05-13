@@ -63,7 +63,7 @@ instruction_t make_divu(Operand const& lhs, Operand const& rhs) {
 }
 
 instruction_t make_mov(Operand const& lhs, Operand const& rhs) {
-    return make_binary(Operations::ADD, lhs, rhs);
+    return make_binary(Operations::MOV, lhs, rhs);
 }
 
 instruction_t make_lea(Operand const& lhs, Operand const& rhs) {
@@ -111,7 +111,7 @@ instruction_t make_xor(Operand const& lhs, Operand const& rhs) {
 }
 
 instruction_t make_neg(Operand const& lhs) {
-    return make_unary(Operations::NEG, lhs);
+    return make_unary(Operations::NOT, lhs);
 }
 
 instruction_t make_shl(Operand const& lhs, Operand const& rhs) {

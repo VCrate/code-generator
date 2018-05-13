@@ -34,13 +34,9 @@ int main() {
 
     Value constant_0 = b.create_value(type::i32);
     b.insn_store(constant_0, 0);
-    Value inf_eq_0 = b.insn_inf_eq(p0, constant_0);
-    b.end_with_branch(inf_eq_0, 
-        allocate,
-        error);
+    b.insn_compare(p0, constant_0);
+    b.end_with_branch_eq(allocate, error);
 */
-
-    Value fake { 0, type::ptr };
 
     Block& a = func.get_block();
     Block b, c, d, e, f;
@@ -51,15 +47,37 @@ int main() {
     d.name = "Block_D";
     e.name = "Block_E";
     f.name = "Block_F";
-
+/*
+    auto fake = a.create_value(type::i32);
     d.end_with_return(fake);
     //d.end_with_jump(e);
-    c.end_with_branch(fake, e, d);
+    c.end_with_branch_gt_eq(e, d);
     b.end_with_jump(c);
     e.end_with_jump(b);
 
-    a.end_with_branch(fake, f, b);
+    a.end_with_branch_eq(f, b);
     f.end_with_halt(fake);
+*/
+
+    auto const_0 = a.create_value(type::i32);
+    auto value = a.create_value(type::i32);
+    a.insn_load(const_0, { 0, 0, 0, 0 });
+    a.insn_copy(value, const_0);
+    a.end_with_halt(value);
+
+    /*
+        MOV %A, 0
+        MOV %B, %A
+        MOV %B, %A
+        HLT
+    or
+        MOV %B, 0
+        MOV %A, %B
+        HLT
+    or
+        MOV %A, 0
+        HLT
+    */
 
     auto exe = func.compile();
 

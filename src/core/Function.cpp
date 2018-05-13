@@ -1,5 +1,6 @@
 #include <vcrate/code-generator/core/Function.hpp>
 
+#include <vcrate/code-generator/core/Block.hpp>
 #include <vcrate/code-generator/helper/Dumper.hpp>
 #include <vcrate/code-generator/instruction/Encoder.hpp>
 #include <vcrate/bytecode/v1.hpp>
@@ -20,25 +21,28 @@ Value Function::get_parameter(ui32 pos) const {
 }
 
 ui32 predict_size(Block const& b) {
-    switch(b.end_method) {
-        case Block::EndMethod::Jump:
-            return 1; // JMP
-
-        case Block::EndMethod::Branch:
-            return 2; // JMPEQ, JMP
-        
-        case Block::EndMethod::Halt:
-            return 1; // HLT
-
-        case Block::EndMethod::Return:
-            return 2; // LVE, RET
-
-        case Block::EndMethod::Throw:
-            return 2; // OUT, HLT
-
-        default:
-            return 0;
+    ui32 size = 0;
+    for(auto const& insn : b.insn) {
+        switch(insn.op) {
+            case Block::InsnOp::Copy:
+                size += 1;
+                break;
+            case Block::InsnOp::Load:
+                size += (insn.raw.size() + 3) / 4;
+                break;
+            default:
+                std::cout << "Unknown Instruction Operation\n";
+                break;
+        }
     }
+
+    return size + std::visit(overloaded {
+        [] (Block::EndValueJump const&  ) { return 1; }, // JMP
+        [] (Block::EndValueBranch const&) { return 2; }, // JMPX, JMP
+        [] (Block::EndValueHalt const&  ) { return 2; }, // MOV, HLT
+        [] (Block::EndValueThrow const& ) { return 2; }, // LVE, RET
+        [] (Block::EndValueReturn const&) { return 2; }  // MOV, HLT
+    }, b.end_value);
 }
 
 struct blocks_info_t {
@@ -60,25 +64,25 @@ blocks_info_t get_blocks_info(const Block* start) {
 
         infos.blocks.insert(cur);
 
-        switch(cur->end_method) {
-            case Block::EndMethod::Jump: {
-                to_visit.push(cur->end_value.next);
-                infos.previous[cur->end_value.next].push_back(cur);
-                break;
-            }
-
-            case Block::EndMethod::Branch: {
-                to_visit.push(cur->end_value.then);
-                infos.previous[cur->end_value.then].push_back(cur);
-                to_visit.push(cur->end_value.otherwise);
-                infos.previous[cur->end_value.otherwise].push_back(cur);
-                break;
-            }
-
-            default:
+        if (std::visit(overloaded {
+            [&] (Block::EndValueJump const& value) { 
+                to_visit.push(value.next);
+                infos.previous[value.next].push_back(cur);
+                return true; 
+            },
+            [&] (Block::EndValueBranch const& value) {
+                to_visit.push(value.then);
+                infos.previous[value.then].push_back(cur);
+                to_visit.push(value.otherwise);
+                infos.previous[value.otherwise].push_back(cur);
+                return true; 
+            },
+            [&] (auto) { 
                 infos.end.insert(cur);
-                continue;
-        }
+                return false; 
+            }
+        }, cur->end_value))
+            break;
     }
     return infos;
 }
@@ -135,18 +139,17 @@ best_order_t find_best_order(std::vector<const Block*> const& current, std::vect
 
             best_order_t cur_best = find_best_order(cur, remaining);
 
-            bool is_short_branch = false;
-            switch(last->end_method) {
-                case Block::EndMethod::Jump:
-                    is_short_branch = last->end_value.next == *it;
-                    break;
-                case Block::EndMethod::Branch:
-                    is_short_branch = last->end_value.then == *it && last->end_value.otherwise == *it;
-                    break;
-                default:
-                    is_short_branch = false;
-                    break;
-            }
+            bool is_short_branch = std::visit(overloaded {
+                [&] (Block::EndValueJump const& value) { 
+                    return value.next == *it; 
+                },
+                [&] (Block::EndValueBranch const& value) {
+                    return value.then == *it && value.otherwise == *it; 
+                },
+                [] (auto) { 
+                    return false; 
+                }
+            }, last->end_value);
 
             if (is_short_branch)
                 cur_best.second++;
@@ -211,35 +214,49 @@ std::optional<vcx::Executable> Function::compile() const {
 
     for(auto[pos, block] : ordered_blocks) {
         (void)pos;
-        switch(block->end_method) {
-            case Block::EndMethod::Jump:
+        for(auto const& insn : block->insn) {
+            switch(insn.op) {
+                case Block::InsnOp::Copy:
+                    push_insn(exe.code, make_mov(Operand::Register(insn.values[0].id), Operand::Register(insn.values[1].id)));
+                    break;
+                case Block::InsnOp::Load:
+                    ui32 raw_size = (insn.raw.size() + 3) / 4;
+                    auto get_raw = [&raw = insn.raw] (ui32 idx) {
+                        return raw.size() < idx ? raw[idx] : 0;
+                    };
+                    for(ui32 i = 0; i < raw_size; ++i) {
+                        ui32 value = get_raw(i) | get_raw(i+1)<<8 | get_raw(i+2)<<16 | get_raw(i+3)<<24;
+                        push_insn(exe.code, make_mov(Operand::Register(insn.values[0].id), Operand::Value(value)));
+                    }
+                    break;
+            }
+        }
+        std::visit(overloaded {
+            [&] (Block::EndValueJump const& value) {
                 push_insn(exe.code, make_out(Operand::Value((ui32)block->name.back())));
-                push_insn(exe.code, make_jmp(Operand::Value(get_offset_to(block->end_value.next))));
-                continue;
-
-            case Block::EndMethod::Branch:
+                push_insn(exe.code, make_jmp(Operand::Value(get_offset_to(value.next))));
+            },
+            [&] (Block::EndValueBranch const& value) {
                 push_insn(exe.code, make_out(Operand::Value((ui32)block->name.back())));
-                push_insn(exe.code, make_jmpe(Operand::Value(get_offset_to(block->end_value.then))));
-                push_insn(exe.code, make_jmp(Operand::Value(get_offset_to(block->end_value.otherwise))));
-                continue;
-            
-            case Block::EndMethod::Halt:
+                push_insn(exe.code, make_jmpe(Operand::Value(get_offset_to(value.then))));
+                push_insn(exe.code, make_jmp(Operand::Value(get_offset_to(value.otherwise))));
+            },
+            [&] (Block::EndValueHalt const& value) {
                 push_insn(exe.code, make_out(Operand::Value((ui32)block->name.back())));
+                push_insn(exe.code, make_mov(Operand::Register(0), Operand::Register(value.halt_code.id)));
                 push_insn(exe.code, make_hlt());
-                continue;
-
-            case Block::EndMethod::Return:
+            },
+            [&] (Block::EndValueThrow const& value) {
+                push_insn(exe.code, make_out(Operand::Value((ui32)block->name.back())));
+                push_insn(exe.code, make_mov(Operand::Register(0), Operand::Value(1)));
+                push_insn(exe.code, make_hlt());
+            },
+            [&] (Block::EndValueReturn const& value) {
                 push_insn(exe.code, make_out(Operand::Value((ui32)block->name.back())));
                 push_insn(exe.code, make_lve());
                 push_insn(exe.code, make_ret());
-                continue;
-
-            case Block::EndMethod::Throw:
-                push_insn(exe.code, make_out(Operand::Value((ui32)block->name.back())));
-                push_insn(exe.code, make_out(Operand::Value(42)));
-                push_insn(exe.code, make_hlt());
-                continue;
-        }
+            }
+        }, block->end_value);
     }
 
     return exe;

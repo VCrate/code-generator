@@ -6,8 +6,8 @@
 namespace vcrate { namespace code_gen {
 
 struct Value {
-    const ui64 id;
-    const Type type;
+    ui64 id;
+    Type type;
 };
 
 }}
