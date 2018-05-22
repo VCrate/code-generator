@@ -17,10 +17,12 @@ namespace vcrate { namespace code_gen {
 template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
+class Context;
+
 class Block {
 public:
 
-    Value create_value(Type const& type/*, Constant const& constant*/);
+    Block(Context& context);
 
     void end_with_jump(Block& block);
     void end_with_branch_eq(Block& then, Block& otherwise);
@@ -81,6 +83,12 @@ public:
     };
 
     std::string name;
+
+private:
+
+    friend class Context;
+
+    Context* context;
     EndValue end_value;    
     ui32 current_value_id = 0;
     std::vector<insn_t> insn;

@@ -1,10 +1,10 @@
 #include <vcrate/code-generator/core/Block.hpp>
 
+#include <vcrate/code-generator/core/Context.hpp>
+
 namespace vcrate { namespace code_gen {
 
-Value Block::create_value(Type const& type) {
-    return Value { current_value_id++, type };
-}
+Block::Block(Context& context) : context(&context) {}
 
 void Block::end_with_jump(Block& block) {
     end_value = Block::EndValueJump { &block };
@@ -99,7 +99,7 @@ void Block::insn_dbg(Value const& value) {
 
 Value Block::insn_new(Value const& size) {
     // TODO
-    return create_value(type::ptr);
+    return context->create_value(type::ptr);
 }
 
 void Block::insn_compare(Value const& lhs, Value const& rhs) {

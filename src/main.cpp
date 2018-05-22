@@ -3,6 +3,7 @@
 
 #include <vcrate/Alias.hpp>
 #include <vcrate/code-generator/helper/Dumper.hpp>
+#include <vcrate/code-generator/core/Context.hpp>
 #include <vcrate/code-generator/core/Function.hpp>
 #include <vcrate/code-generator/core/Block.hpp>
 #include <vcrate/code-generator/value/Value.hpp>
@@ -15,7 +16,7 @@ int main() {
     using namespace vcrate::code_gen;
 
 
-    Function func;
+    Context ctx;
     // func.set_return_type(type::ptr);
     // func.set_parameters(type::ui32);
     /*
@@ -38,8 +39,13 @@ int main() {
     b.end_with_branch_eq(allocate, error);
 */
 
+    Function& func = ctx.create_function();
     Block& a = func.get_block();
-    Block b, c, d, e, f;
+    Block b(ctx.create_block()), 
+          c(ctx.create_block()), 
+          d(ctx.create_block()), 
+          e(ctx.create_block()), 
+          f(ctx.create_block());
 
     a.name = "Block_A";
     b.name = "Block_B";
@@ -48,7 +54,7 @@ int main() {
     e.name = "Block_E";
     f.name = "Block_F";
 /*
-    auto fake = a.create_value(type::i32);
+    auto fake = ctx.create_value(type::i32);
     d.end_with_return(fake);
     //d.end_with_jump(e);
     c.end_with_branch_gt_eq(e, d);
@@ -59,8 +65,8 @@ int main() {
     f.end_with_halt(fake);
 */
 
-    auto const_1 = a.create_value(type::i32);
-    auto value = a.create_value(type::i32);
+    auto const_1 = ctx.create_value(type::i32);
+    auto value = ctx.create_value(type::i32);
     a.insn_load(const_1, { 1, 0, 0, 0 });
     a.insn_copy(value, const_1);
     a.insn_dbg(value);
@@ -80,7 +86,7 @@ int main() {
         HLT
     */
 
-    auto exe = func.compile();
+    auto exe = ctx.compile();
 
     if (!exe) {
         std::cout << "Couldn't compile\n";
