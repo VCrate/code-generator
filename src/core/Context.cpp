@@ -39,25 +39,21 @@ Context::blocks_info_t Context::get_blocks_info(const Block* first) {
 
         infos.blocks.insert(cur);
 
-        if (std::visit(overloaded {
+        std::visit(overloaded {
             [&] (Block::EndValueJump const& value) { 
                 to_visit.push(value.next);
                 infos.previous[value.next].push_back(cur);
-                return true; 
             },
             [&] (Block::EndValueBranch const& value) {
                 to_visit.push(value.then);
                 infos.previous[value.then].push_back(cur);
                 to_visit.push(value.otherwise);
                 infos.previous[value.otherwise].push_back(cur);
-                return true; 
             },
             [&] (auto) { 
                 infos.end.insert(cur);
-                return false; 
             }
-        }, cur->end_value))
-            break;
+        }, cur->end_value);
     }
     return infos;
 }
@@ -145,6 +141,9 @@ ui32 Context::predict_size(Block const& b) {
             case Block::InsnOp::Debug:
                 size += 1;
                 break;
+            case Block::InsnOp::Compare:
+                size += 1;
+                break;
             default:
                 std::cout << "Unknown Instruction Operation\n";
                 break;
@@ -187,6 +186,9 @@ std::optional<vcx::Executable> Context::compile() const {
 
     for(auto[pos, block] : ordered_blocks) {
         (void)pos;
+
+        std::cout << block->name << '\n';
+
         for(auto const& insn : block->insn) {
             switch(insn.op) {
                 case Block::InsnOp::Copy:
@@ -205,6 +207,9 @@ std::optional<vcx::Executable> Context::compile() const {
                 }
                 case Block::InsnOp::Debug:
                     push_insn(exe.code, make_dbg(Operand::Register(insn.values[0].get_id())));
+                    break;
+                case Block::InsnOp::Compare:
+                    push_insn(exe.code, make_cmp(Operand::Register(insn.values[0].get_id()), Operand::Register(insn.values[1].get_id())));
                     break;
             }
         }

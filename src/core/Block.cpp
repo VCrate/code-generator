@@ -68,8 +68,13 @@ void Block::end_with_halt(Value const& v) {
     end_value = Block::EndValueHalt{ v }; 
 }
 
-void Block::end_with_return(Value const& v){
-    end_value = Block::EndValueReturn{ v }; 
+void Block::end_with_return(Value const& v) {
+    end_value = Block::EndValueReturn{ { v } }; 
+    // TODO: set return value
+}
+
+void Block::end_with_return() {
+    end_value = Block::EndValueReturn{ std::nullopt }; 
     // TODO: set return value
 }
 
@@ -97,13 +102,12 @@ void Block::insn_dbg(Value const& value) {
     });
 }
 
-Value Block::insn_new(Value const& size) {
-    // TODO
-    return context->create_value(type::ptr);
-}
-
 void Block::insn_compare(Value const& lhs, Value const& rhs) {
-    // TODO
+    insn.push_back({
+        Block::InsnOp::Compare,
+        {lhs, rhs},
+        {}
+    });
 }
 
 }}

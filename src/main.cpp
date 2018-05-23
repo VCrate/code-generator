@@ -66,12 +66,23 @@ int main() {
 */
 
     auto const_1 = ctx.create_value(type::i32);
+    auto const_2 = ctx.create_value(type::i32);
+    auto const_3 = ctx.create_value(type::i32);
     auto value = ctx.create_value(type::i32);
     a.insn_load(const_1, { 1, 0, 0, 0 });
+    a.insn_load(const_2, { 2, 0, 0, 0 });
+    a.insn_load(const_3, { 3, 0, 0, 0 });
     a.insn_copy(value, const_1);
     a.insn_dbg(value);
-    a.end_with_halt(value);
+    a.insn_compare(const_1, const_2);
+    a.end_with_branch_eq(b, c);
 
+    b.insn_dbg(const_2);
+    b.end_with_halt(value);
+
+    c.insn_dbg(const_3);
+    c.end_with_return();
+    
     /*
         MOV %A, 0
         MOV %B, %A

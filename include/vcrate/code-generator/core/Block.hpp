@@ -3,8 +3,10 @@
 #include <vcrate/Alias.hpp>
 #include <vcrate/code-generator/value/Value.hpp>
 #include <vcrate/bytecode/Operations.hpp>
+
 #include <string>
 #include <variant>
+#include <optional>
 
 namespace vcrate { namespace code_gen {
 
@@ -34,12 +36,12 @@ public:
     void end_with_throw(Value const& v);
     void end_with_halt(Value const& v);
     void end_with_return(Value const& v);
+    void end_with_return();
 
     void insn_load(Value const& to, std::vector<ui8> const& raw);
     void insn_copy(Value const& to, Value const& from);
     void insn_dbg(Value const& value);
     void insn_compare(Value const& lhs, Value const& rhs);
-    Value insn_new(Value const& size);
 
     enum class BranchMethod {
         Equal, Different,
@@ -62,7 +64,7 @@ public:
     };
 
     struct EndValueReturn {
-        Value output;
+        std::optional<Value> output;
     };
 
     struct EndValueThrow {
@@ -73,7 +75,8 @@ public:
 
     enum class InsnOp {
         Copy, Load, 
-        Debug
+        Debug,
+        Compare
     };
 
     struct insn_t {
