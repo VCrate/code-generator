@@ -5,19 +5,22 @@
 
 namespace vcrate { namespace code_gen {
 
+class Context;
+
 class Value {
 public:
 
-    Value(Type const& type, ui32 id);
+    Value(Context& context, ui64 id, Type const& type);
 
+    Context& get_context();
+    ui64 get_id() const;
     Type get_type() const;
-    ui32 get_id() const;
 
 private:
 
+    Context* context;
+    ui64 id;
     Type type;
-    ui32 id;
-
 };
 
 }}
