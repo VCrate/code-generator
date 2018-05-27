@@ -12,49 +12,121 @@
 
 namespace vcrate { namespace code_gen {
 
-Function& Context::create_function() {
-    functions.emplace_back(*this);
-    return functions.back();
+void Context::blocks_info_t::dump(std::ostream& os) {
+    os << "Starting from " << Dumper::bolder() << origin->name << Dumper::clearer() << '\n';
+    os << "Blocks: \n";
+    for (auto b : blocks) {
+        os << '\t' << Dumper::bolder() << b->name << Dumper::clearer();
+        if (end.count(b) > 0)
+            os << Dumper::italicize() << " [ENDING]" << Dumper::clearer();
+        if (!previous[b].empty()) {
+            os << Dumper::colorizer(Color::Yellow) << "\n\t  Parents {";
+            for(auto p : previous[b])
+                os << ' ' << p->name;
+            os << " }" << Dumper::clearer();
+        }
+
+        if (!path_to[b].empty()) {
+            os << Dumper::colorizer(Color::Green) << "\n\t  Link to {";
+            for(auto p : path_to[b])
+                os << ' ' << p->name;
+            os << " }" << Dumper::clearer();
+        }
+
+        os << '\n';
+    }
 }
 
-Block Context::create_block() {
-    return Block(*this);
+Function& Context::create_function(std::string const& name) {
+    auto& function = functions.emplace_back(new Function(*this));
+    function->name = name;
+    return *function;
 }
 
-Value Context::create_value(Type const& type) {
-    return Value(*this, uid_value++, type);
+Block& Context::create_block(std::string const& name) {
+    auto& block = blocks.emplace_back(new Block(*this));
+    block->name = name;
+    return *block;
+}
+
+Value& Context::create_value(Type const& type, std::string const& name) {
+    auto& value = values.emplace_back(new Value(*this, type));
+    value->name = name;
+    return *value;
 }
 
 Context::blocks_info_t Context::get_blocks_info(const Block* first) {
     Context::blocks_info_t infos;
-    std::stack<const Block*> to_visit;
-    to_visit.push(first);
+    infos.origin = first;
+    {
+        std::stack<const Block*> to_visit;
+        to_visit.push(first);
 
-    while(!to_visit.empty()) {
-        const Block* cur = to_visit.top();
-        to_visit.pop();
+        while(!to_visit.empty()) {
+            const Block* cur = to_visit.top();
+            to_visit.pop();
 
-        if (infos.blocks.count(cur))
-            continue;
+            if (infos.blocks.count(cur))
+                continue;
 
-        infos.blocks.insert(cur);
+            infos.blocks.insert(cur);
+
+            std::visit(overloaded {
+                [&] (Block::EndValueJump const& value) { 
+                    to_visit.push(value.next);
+                    infos.previous[value.next].push_back(cur);
+                    infos.path_to[cur].insert(value.next);
+                    infos.path_to[cur].insert(infos.path_to[value.next].begin(), infos.path_to[value.next].end());
+                },
+                [&] (Block::EndValueBranch const& value) {
+                    to_visit.push(value.then);
+                    infos.previous[value.then].push_back(cur);
+                    to_visit.push(value.otherwise);
+                    infos.previous[value.otherwise].push_back(cur);
+                },
+                [&] (auto) { 
+                    infos.end.insert(cur);
+                }
+            }, cur->end_value);
+        }
+    }
+
+    for(auto b : infos.blocks) {
+        Context::blocks_vec_t to_visit;
 
         std::visit(overloaded {
-            [&] (Block::EndValueJump const& value) { 
-                to_visit.push(value.next);
-                infos.previous[value.next].push_back(cur);
-            },
-            [&] (Block::EndValueBranch const& value) {
-                to_visit.push(value.then);
-                infos.previous[value.then].push_back(cur);
-                to_visit.push(value.otherwise);
-                infos.previous[value.otherwise].push_back(cur);
-            },
-            [&] (auto) { 
-                infos.end.insert(cur);
+            [&] (Block::EndValueJump const& value)   { to_visit.push_back(value.next); },
+            [&] (Block::EndValueBranch const& value) { to_visit.push_back(value.then); 
+                                                       to_visit.push_back(value.otherwise); },
+            [ ] (auto) {}
+        }, b->end_value);
+
+        while(!to_visit.empty()) {
+            const Block* cur = to_visit.back();
+            to_visit.pop_back();
+
+            infos.path_to[b].insert(cur);
+
+            if (infos.path_to[cur].empty()) {
+                std::visit(overloaded {
+                    [&] (Block::EndValueJump const& value) { 
+                        if (value.next != b && infos.path_to[b].count(value.next) == 0)
+                            to_visit.push_back(value.next); 
+                    },
+                    [&] (Block::EndValueBranch const& value) {
+                        if (value.then != b && infos.path_to[b].count(value.then) == 0)
+                            to_visit.push_back(value.then); 
+                        if (value.otherwise != b && infos.path_to[b].count(value.otherwise) == 0)
+                            to_visit.push_back(value.otherwise);
+                    },
+                    [ ] (auto) {}
+                }, cur->end_value);
+            } else {
+                infos.path_to[b].insert(infos.path_to[cur].begin(), infos.path_to[cur].end());
             }
-        }, cur->end_value);
+        }
     }
+
     return infos;
 }
 
@@ -159,12 +231,58 @@ ui32 Context::predict_size(Block const& b) {
     }, b.end_value);
 }
 
+Context::values_info_t Context::get_values_info(Context::blocks_info_t const& blocks) {
+    Context::values_info_t info;
+
+    for(auto* block : blocks.blocks)
+        for(auto const& insn : block->insn)
+            for(auto value : insn.values) {
+                info.values.insert(value);
+                info.used_in[value].insert(block);
+            }
+    
+    return info;
+}
+
+Context::scope_t Context::find_scope(Value const& value, Context::blocks_info_t& blocks, 
+    Context::values_info_t values) {
+
+    Context::blocks_set_t& blocks_using_value = values.used_in[&value];
+    Context::scope_t scope;
+
+    for(auto block : blocks_using_value) {
+        scope.insert(block);
+        for(auto child : blocks.path_to[block]) {
+            if (blocks_using_value.count(child) > 0)
+                scope.insert(child);
+            else {
+                for(auto using_value : blocks_using_value) {
+                    if (blocks.path_to[child].count(using_value) > 0) {
+                        scope.insert(child);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    return scope;
+}
+
 std::optional<vcx::Executable> Context::compile() const {
-    Function const& function = functions[0];
+    Function const& function = *functions[0];
 
-    Context::blocks_info_t blocks = get_blocks_info(&function.origin);
+    Context::blocks_info_t blocks_info = get_blocks_info(function.origin);
+    Context::values_info_t values_info = get_values_info(blocks_info);
+    blocks_info.dump();
 
-    auto block_pos = compute_position(blocks);
+    for(auto& value : values) {
+        std::cout << "Value " << value->name << " is used in \n";
+        for(auto b : find_scope(*value, blocks_info, values_info))
+            std::cout << "> " << b->name << '\n';
+    }
+
+    auto block_pos = compute_position(blocks_info);
     std::multimap<ui32, const Block*> ordered_blocks;
     for(auto[b, p] : block_pos)
         ordered_blocks.insert({p, b});
@@ -178,7 +296,7 @@ std::optional<vcx::Executable> Context::compile() const {
     };
 
     vcx::Executable exe;
-    exe.entry_point = block_pos[&function.origin]*4;
+    exe.entry_point = block_pos[function.origin]*4;
 
     auto get_offset_to = [&block_pos, &exe] (auto b) {
         return block_pos[b] * 4 - exe.code.size() * 4;
@@ -192,7 +310,7 @@ std::optional<vcx::Executable> Context::compile() const {
         for(auto const& insn : block->insn) {
             switch(insn.op) {
                 case Block::InsnOp::Copy:
-                    push_insn(exe.code, make_mov(Operand::Register(insn.values[0].get_id()), Operand::Register(insn.values[1].get_id())));
+                    //push_insn(exe.code, make_mov(Operand::Register(insn.values[0].get_id()), Operand::Register(insn.values[1].get_id())));
                     break;
                 case Block::InsnOp::Load: {
                     ui32 raw_size = (insn.raw.size() + 3) / 4;
@@ -201,15 +319,15 @@ std::optional<vcx::Executable> Context::compile() const {
                     };
                     for(ui32 i = 0; i < raw_size; ++i) {
                         ui32 value = get_raw(i) | get_raw(i+1)<<8 | get_raw(i+2)<<16 | get_raw(i+3)<<24;
-                        push_insn(exe.code, make_mov(Operand::Register(insn.values[0].get_id()), Operand::Value(value)));
+                        //push_insn(exe.code, make_mov(Operand::Register(insn.values[0].get_id()), Operand::Value(value)));
                     }
                     break;
                 }
                 case Block::InsnOp::Debug:
-                    push_insn(exe.code, make_dbg(Operand::Register(insn.values[0].get_id())));
+                    //push_insn(exe.code, make_dbg(Operand::Register(insn.values[0].get_id())));
                     break;
                 case Block::InsnOp::Compare:
-                    push_insn(exe.code, make_cmp(Operand::Register(insn.values[0].get_id()), Operand::Register(insn.values[1].get_id())));
+                    //push_insn(exe.code, make_cmp(Operand::Register(insn.values[0].get_id()), Operand::Register(insn.values[1].get_id())));
                     break;
             }
         }
@@ -225,7 +343,7 @@ std::optional<vcx::Executable> Context::compile() const {
             },
             [&] (Block::EndValueHalt const& value) {
                 //push_insn(exe.code, make_out(Operand::Value((ui32)block->name.back())));
-                push_insn(exe.code, make_mov(Operand::Register(0), Operand::Register(value.halt_code.get_id())));
+                //push_insn(exe.code, make_mov(Operand::Register(0), Operand::Register(value.halt_code.get_id())));
                 push_insn(exe.code, make_hlt());
             },
             [&] (Block::EndValueThrow const& ) {

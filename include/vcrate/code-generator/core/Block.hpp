@@ -3,6 +3,7 @@
 #include <vcrate/Alias.hpp>
 #include <vcrate/code-generator/value/Value.hpp>
 #include <vcrate/bytecode/Operations.hpp>
+#include <vcrate/code-generator/helper/Dumper.hpp>
 
 #include <string>
 #include <variant>
@@ -24,7 +25,7 @@ class Context;
 class Block {
 public:
 
-    Block(Context& context);
+    void dump(std::ostream& os = std::cout) const;
 
     void end_with_jump(Block& block);
     void end_with_branch_eq(Block& then, Block& otherwise);
@@ -33,15 +34,15 @@ public:
     void end_with_branch_gt(Block& then, Block& otherwise);
     void end_with_branch_lt_eq(Block& then, Block& otherwise);
     void end_with_branch_lt(Block& then, Block& otherwise);
-    void end_with_throw(Value const& v);
-    void end_with_halt(Value const& v);
-    void end_with_return(Value const& v);
+    void end_with_throw(Value& v);
+    void end_with_halt(Value& v);
+    void end_with_return(Value& v);
     void end_with_return();
 
-    void insn_load(Value const& to, std::vector<ui8> const& raw);
-    void insn_copy(Value const& to, Value const& from);
-    void insn_dbg(Value const& value);
-    void insn_compare(Value const& lhs, Value const& rhs);
+    void insn_load(Value& to, std::vector<ui8> const& raw);
+    void insn_copy(Value& to, Value& from);
+    void insn_dbg(Value& value);
+    void insn_compare(Value& lhs, Value& rhs);
 
     enum class BranchMethod {
         Equal, Different,
@@ -60,15 +61,15 @@ public:
     };
 
     struct EndValueHalt {
-        Value halt_code;
+        Value* halt_code;
     };
 
     struct EndValueReturn {
-        std::optional<Value> output;
+        std::optional<Value*> output;
     };
 
     struct EndValueThrow {
-        Value trew;
+        Value* threw;
     };
 
     using EndValue = std::variant<EndValueJump, EndValueBranch, EndValueHalt, EndValueReturn, EndValueThrow>;
@@ -81,7 +82,7 @@ public:
 
     struct insn_t {
         InsnOp op;
-        std::vector<Value> values;
+        std::vector<Value*> values;
         std::vector<ui8> raw;
     };
 
@@ -90,6 +91,8 @@ public:
 private:
 
     friend class Context;
+
+    Block(Context& context);
 
     Context* context;
     EndValue end_value;    

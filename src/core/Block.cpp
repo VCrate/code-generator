@@ -6,6 +6,35 @@ namespace vcrate { namespace code_gen {
 
 Block::Block(Context& context) : context(&context) {}
 
+void Block::dump(std::ostream& os) const {
+    os << Dumper::bolder() << "Block <" << name << ">" << Dumper::clearer();
+    os << " with " << insn.size() << " instructions and terminating by ";
+    std::visit(overloaded {
+        [&] (Block::EndValueJump const&   v) { os << "a jump to " << v.next->name << '\n'; },
+        [&] (Block::EndValueHalt const&    ) { os << "halting\n"; },
+        [&] (Block::EndValueThrow const&  v) { os << "a throwing " << v.threw->name << '\n'; },
+        [&] (Block::EndValueReturn const& v) { 
+            os << "returning ";
+            if (v.output)
+                os << (*v.output)->name << '\n';
+            else
+                os << "from the function\n";
+        },
+        [&] (Block::EndValueBranch const& v) {
+            os << "comparing ";
+            switch(v.cond) {
+                case BranchMethod::Equal: os << "equality"; break;
+                case BranchMethod::Different: os << "non equality"; break;
+                case BranchMethod::Greater: os << "greatest"; break;
+                case BranchMethod::GreaterEqual: os << "non less"; break;
+                case BranchMethod::Less: os << "less"; break;
+                case BranchMethod::LessEqual: os << "non greatest"; break;
+            }
+            os << " to " << v.then->name << " or else " << v.otherwise->name << '\n';
+        }
+    }, end_value);
+}
+
 void Block::end_with_jump(Block& block) {
     end_value = Block::EndValueJump { &block };
 }
@@ -58,18 +87,18 @@ void Block::end_with_branch_lt_eq(Block& then, Block& otherwise) {
     };
 }
 
-void Block::end_with_throw(Value const& v) {
-    end_value = Block::EndValueThrow{ v }; 
+void Block::end_with_throw(Value& v) {
+    end_value = Block::EndValueThrow{ &v }; 
     // TODO: set throw value
     // actual version will halt
 }
 
-void Block::end_with_halt(Value const& v) {
-    end_value = Block::EndValueHalt{ v }; 
+void Block::end_with_halt(Value& v) {
+    end_value = Block::EndValueHalt{ &v }; 
 }
 
-void Block::end_with_return(Value const& v) {
-    end_value = Block::EndValueReturn{ { v } }; 
+void Block::end_with_return(Value& v) {
+    end_value = Block::EndValueReturn{ { &v } }; 
     // TODO: set return value
 }
 
@@ -78,34 +107,34 @@ void Block::end_with_return() {
     // TODO: set return value
 }
 
-void Block::insn_load(Value const& to, std::vector<ui8> const& raw) {
+void Block::insn_load(Value& to, std::vector<ui8> const& raw) {
     insn.push_back({
         Block::InsnOp::Load,
-        {to},
+        {&to},
         raw
     });
 }
 
-void Block::insn_copy(Value const& to, Value const& from) {
+void Block::insn_copy(Value& to, Value& from) {
     insn.push_back({
         Block::InsnOp::Copy,
-        {to, from},
+        {&to, &from},
         {}
     });
 }
 
-void Block::insn_dbg(Value const& value) {
+void Block::insn_dbg(Value& value) {
     insn.push_back({
         Block::InsnOp::Debug,
-        {value},
+        {&value},
         {}
     });
 }
 
-void Block::insn_compare(Value const& lhs, Value const& rhs) {
+void Block::insn_compare(Value& lhs, Value& rhs) {
     insn.push_back({
         Block::InsnOp::Compare,
-        {lhs, rhs},
+        {&lhs, &rhs},
         {}
     });
 }

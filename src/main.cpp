@@ -39,20 +39,15 @@ int main() {
     b.end_with_branch_eq(allocate, error);
 */
 
-    Function& func = ctx.create_function();
+    Function& func = ctx.create_function("Function_A");
     Block& a = func.get_block();
-    Block b(ctx.create_block()), 
-          c(ctx.create_block()), 
-          d(ctx.create_block()), 
-          e(ctx.create_block()), 
-          f(ctx.create_block());
+    Block &b(ctx.create_block("Block_B")), 
+          &c(ctx.create_block("Block_C")), 
+          &d(ctx.create_block("Block_D")), 
+          &e(ctx.create_block("Block_E")), 
+          &f(ctx.create_block("Block_F"));
 
     a.name = "Block_A";
-    b.name = "Block_B";
-    c.name = "Block_C";
-    d.name = "Block_D";
-    e.name = "Block_E";
-    f.name = "Block_F";
 /*
     auto fake = ctx.create_value(type::i32);
     d.end_with_return(fake);
@@ -65,10 +60,10 @@ int main() {
     f.end_with_halt(fake);
 */
 
-    auto const_1 = ctx.create_value(type::i32);
-    auto const_2 = ctx.create_value(type::i32);
-    auto const_3 = ctx.create_value(type::i32);
-    auto value = ctx.create_value(type::i32);
+    auto& const_1 = ctx.create_value(type::i32, "const_1");
+    auto& const_2 = ctx.create_value(type::i32, "const_2");
+    auto& const_3 = ctx.create_value(type::i32, "const_3");
+    auto& value = ctx.create_value(type::i32, "value");
     a.insn_load(const_1, { 1, 0, 0, 0 });
     a.insn_load(const_2, { 2, 0, 0, 0 });
     a.insn_load(const_3, { 3, 0, 0, 0 });
@@ -81,21 +76,15 @@ int main() {
     b.end_with_halt(value);
 
     c.insn_dbg(const_3);
-    c.end_with_return();
-    
-    /*
-        MOV %A, 0
-        MOV %B, %A
-        MOV %B, %A
-        HLT
-    or
-        MOV %B, 0
-        MOV %A, %B
-        HLT
-    or
-        MOV %A, 0
-        HLT
-    */
+    c.end_with_jump(d);
+
+    d.insn_dbg(value);
+    d.end_with_return();
+
+    a.dump();
+    b.dump();
+    c.dump();
+    d.dump();
 
     auto exe = ctx.compile();
 

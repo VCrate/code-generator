@@ -13,17 +13,19 @@ class Context;
 class Function {
 public:
 
-    Function(Context& context);
-
     Block& get_block();
     Value get_parameter(ui32 pos) const;
+
+    std::string name;
 
 private:
 
     friend class Context;
 
+    Function(Context& context);
+
     Context* context;
-    Block origin;
+    Block* origin;
 
 };
 

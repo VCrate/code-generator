@@ -13,10 +13,10 @@
 
 namespace vcrate { namespace code_gen {
 
-Function::Function(Context& context) : context(&context), origin(context.create_block()) {}
+Function::Function(Context& context) : context(&context), origin(&context.create_block()) {}
 
 Block& Function::get_block() {
-    return origin;
+    return *origin;
 }
 
 Value Function::get_parameter(ui32 pos) const {

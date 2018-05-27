@@ -10,16 +10,18 @@ class Context;
 class Value {
 public:
 
-    Value(Context& context, ui64 id, Type const& type);
-
     Context& get_context();
-    ui64 get_id() const;
     Type get_type() const;
+
+    std::string name;
 
 private:
 
+    friend class Context;
+
+    Value(Context& context, Type const& type);
+
     Context* context;
-    ui64 id;
     Type type;
 };
 
