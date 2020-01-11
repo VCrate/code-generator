@@ -244,20 +244,26 @@ Context::values_info_t Context::get_values_info(Context::blocks_info_t const& bl
     return info;
 }
 
-Context::scope_t Context::find_scope(Value const& value, Context::blocks_info_t& blocks, 
-    Context::values_info_t values) {
+Context::scope_t Context::find_scope(Value const& value, Context::blocks_info_t const& blocks, 
+    Context::values_info_t const& values) {
 
-    Context::blocks_set_t& blocks_using_value = values.used_in[&value];
+    Context::blocks_set_t const& blocks_using_value = values.used_in.find(&value)->second;
     Context::scope_t scope;
 
     for(auto block : blocks_using_value) {
         scope.insert(block);
-        for(auto child : blocks.path_to[block]) {
+        auto it_path_to_block = blocks.path_to.find(block);
+        if (it_path_to_block == blocks.path_to.end())
+            continue;
+        for(auto child : it_path_to_block->second) {
             if (blocks_using_value.count(child) > 0)
                 scope.insert(child);
             else {
                 for(auto using_value : blocks_using_value) {
-                    if (blocks.path_to[child].count(using_value) > 0) {
+                    auto it_path_to_child = blocks.path_to.find(child);
+                    if (it_path_to_child != blocks.path_to.end() 
+                        && it_path_to_child->second.count(using_value) > 0) {
+                            
                         scope.insert(child);
                         break;
                     }
@@ -269,16 +275,33 @@ Context::scope_t Context::find_scope(Value const& value, Context::blocks_info_t&
     return scope;
 }
 
+Context::values_scope_t Context::get_values_scope(Context::blocks_info_t const& blocks_info, 
+    Context::values_info_t const& values_info) {
+
+    Context::values_scope_t scope;
+    for(auto& value : values_info.values)
+        scope.emplace(value, find_scope(*value, blocks_info, values_info));
+    return scope;
+}
+
+Context::operands_usage_t Context::compute_operands_usage(Context::blocks_info_t const& blocks_info, 
+    Context::values_scope_t const& scope) {
+
+    return {};
+}
+
 std::optional<vcx::Executable> Context::compile() const {
     Function const& function = *functions[0];
 
     Context::blocks_info_t blocks_info = get_blocks_info(function.origin);
     Context::values_info_t values_info = get_values_info(blocks_info);
+    Context::values_scope_t values_scope = get_values_scope(blocks_info, values_info);
+    Context::operands_usage_t operands = compute_operands_usage(blocks_info, values_scope);
     blocks_info.dump();
 
-    for(auto& value : values) {
+    for(auto&& [value, scope] : values_scope) {
         std::cout << "Value " << value->name << " is used in \n";
-        for(auto b : find_scope(*value, blocks_info, values_info))
+        for(auto b : scope)
             std::cout << "> " << b->name << '\n';
     }
 

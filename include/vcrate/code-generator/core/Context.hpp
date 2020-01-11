@@ -2,6 +2,7 @@
 
 #include <vcrate/Alias.hpp>
 #include <vcrate/vcx/Executable.hpp>
+#include <vcrate/code-generator/instruction/Operand.hpp>
 
 #include <unordered_set>
 #include <unordered_map>
@@ -49,13 +50,16 @@ private:
     using values_set_t = std::unordered_set<const Value*>;
     using scope_t = blocks_set_t;
     using values_scope_t = std::map<const Value*, scope_t>;
+    using operands_usage_t = std::map<std::pair<const Block*, const Value*>, Operand>;
     struct values_info_t {
         values_set_t values;
         std::unordered_map<const Value*, blocks_set_t> used_in;
     };
 
     static values_info_t get_values_info(blocks_info_t const& blocks);
-    static scope_t find_scope(Value const& value, blocks_info_t& blocks, Context::values_info_t values);
+    static scope_t find_scope(Value const& value, blocks_info_t const& blocks, Context::values_info_t const& values);
+    static values_scope_t get_values_scope(Context::blocks_info_t const& blocks, Context::values_info_t const& values);
+    static operands_usage_t compute_operands_usage(blocks_info_t const& blocks_info, values_scope_t const& scope);
 
     static blocks_info_t get_blocks_info(const Block* first);
     static blocks_order_t find_best_order(blocks_vec_t const& current, blocks_vec_t const& all);
